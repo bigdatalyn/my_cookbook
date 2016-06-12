@@ -1,0 +1,52 @@
+#!/usr/bin/expect -f
+####################################################################
+# Info :  
+# Author : Hong Lin 
+# Date : 2016.06.06 
+# This script run by root
+####################################################################
+
+if {[llength $argv] != 4} {
+	puts "usage: $argv0 localuser username password host 'eg:$argv0 /home/james ftpuser zaq12wsx chefclient'"
+	exit 1
+}
+
+# Log results
+log_file -a /tmp/pwdless_expect.log
+log_user 0
+
+# Set variables
+set localuser [lindex $argv  0] 
+set remoteuser [lindex $argv 1] 
+set remoteuserpwd [lindex $argv 2] 
+set host [lindex $argv 3]
+
+# Set timeout 
+set timeout 4
+
+# Announce which device we are working on and at what time
+send_user "\n"
+send_user ">>>>> Copy authorized_keys to remote_host by ssh-copy-id @ [exec date] <<<<<\n"
+send_user "\n"
+
+#spawn /usr/bin/ssh-copy-id -i $localuser/.ssh/id_rsa $remoteuser@$host
+spawn /usr/bin/ssh-copy-id -i $localuser/.ssh/id_rsa -o StrictHostKeyChecking=no $remoteuser@$host
+match_max 100000
+expect {
+ "All keys were skipped because they already exist on the remote system." { send_user "\n>>>>> authorized_keys is already exist on remote host! @ [exec date] <<<<< \n"; exit 0 }
+ "*yes/no" {
+ send "yes\n"
+ }
+ "*?assword:*" {
+ send -- "$remoteuserpwd\n"
+   expect {
+  "Permission denied, please try again." { send_user "\n>>>>> Permission denied(Maybe the password's wrong)  @ [exec date] <<<<<\n"; exit 1}
+#"expecting." { }
+  timeout { send_user "\n>>>>> Timeout Exceeded - Check Host @ [exec date] <<<<<\n"; exit 1 }
+  }
+ }
+ eof { send_user "\n>>>>> Ssh-copy-id Failed @ [exec date] <<<<<\n"; exit 1 }
+}
+#send "exit\r"
+#expect eof
+exit 0 
